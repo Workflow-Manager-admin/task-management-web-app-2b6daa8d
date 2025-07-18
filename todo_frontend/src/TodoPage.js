@@ -1,6 +1,151 @@
 import React, { useState } from "react";
 import "./TodoPage.css";
 
+/**
+ * Button and UI for suggesting a task using the OpenAI API.
+ * Props:
+ *   onAcceptSuggestion(suggestion: {title, details}): Accepts and adds the suggested task.
+ */
+function SuggestTaskButton({ onAccept }) {
+  const [loading, setLoading] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
+  const [error, setError] = useState(null);
+
+  // PUBLIC_INTERFACE
+  async function fetchSuggestion() {
+    setLoading(true);
+    setError(null);
+
+    // Set up OpenAI call via fetch for browser compatibility.
+    // Show friendly prompt for a productivity todo suggestion.
+    const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      setError("Missing API key.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an assistant providing smart, concise, practical to-do task suggestions for personal productivity applications. Respond with only one actionable task, suitable to add directly to a user's todo list.",
+            },
+            {
+              role: "user",
+              content:
+                "Suggest one productive task for my todo list. Respond only with a task title and its details as JSON {\"title\": ..., \"details\": ...}.",
+            },
+          ],
+          max_tokens: 64,
+          n: 1,
+        }),
+      });
+      const data = await res.json();
+
+      let aiText = "";
+      if (
+        data &&
+        data.choices &&
+        data.choices.length > 0 &&
+        data.choices[0].message &&
+        data.choices[0].message.content
+      ) {
+        aiText = data.choices[0].message.content.trim();
+      } else {
+        setError("API did not return a suggestion.");
+        setLoading(false);
+        return;
+      }
+
+      // Parse for JSON structure
+      let suggestionObj = null;
+      try {
+        const startIdx = aiText.indexOf("{");
+        const endIdx = aiText.lastIndexOf("}");
+        suggestionObj = JSON.parse(
+          aiText.substring(startIdx, endIdx + 1)
+        );
+        if (!suggestionObj.title) throw new Error("No title provided.");
+      } catch (parseErr) {
+        // fallback: use entire AI text as title
+        suggestionObj = { title: aiText, details: "" };
+      }
+
+      setSuggestion(suggestionObj);
+    } catch (err) {
+      setError("Error contacting suggestion service.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ margin: "22px 0", width: "100%" }}>
+      <button
+        className="btn-primary"
+        style={{
+          padding: "8px 30px",
+          minWidth: 120,
+          fontWeight: 600,
+          fontSize: "16px",
+          marginBottom: 5,
+        }}
+        onClick={fetchSuggestion}
+        disabled={loading}
+        aria-label="Suggest task using AI"
+      >
+        {loading ? "Thinking..." : "Suggest Task"}
+      </button>
+      {error && <div style={{ color: "#c0392b", marginTop: 8 }}>{error}</div>}
+      {suggestion && (
+        <div
+          style={{
+            marginTop: 10,
+            background: "#f6f7ff",
+            borderRadius: 10,
+            padding: 15,
+            boxShadow: "0 1.5px 7px rgba(147,149,211,0.10)",
+            maxWidth: 420,
+            marginLeft: "auto",
+            marginRight: "auto",
+          }}
+        >
+          <div style={{ fontWeight: "bold", fontSize: 17, color: "#42427E" }}>
+            {suggestion.title}
+          </div>
+          {suggestion.details && (
+            <div style={{ fontSize: 15, marginTop: 4, color: "#646495" }}>
+              {suggestion.details}
+            </div>
+          )}
+          <button
+            className="btn-primary"
+            style={{
+              marginTop: 11,
+              padding: "5px 18px",
+              fontSize: "15px",
+              borderRadius: 7,
+              background: "#1976D2",
+            }}
+            onClick={() => { onAccept(suggestion); setSuggestion(null); }}
+          >
+            Add to My Tasks
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- StatusBar: Topmost fake mobile status bar (network, wifi, battery) ---
 function StatusBar() {
   return (
@@ -265,6 +410,20 @@ export default function TodoPage() {
       <StatusBar />
       <AppBar />
       <div className="todo-content-area">
+        {/* AI Task Suggestion Button */}
+        <SuggestTaskButton
+          onAccept={suggestion => {
+            // Add the suggestion as a new task
+            setTasks(ts => [
+              ...ts,
+              {
+                ...suggestion,
+                id: Date.now() + Math.floor(Math.random() * 10000),
+                completed: false,
+              },
+            ]);
+          }}
+        />
         <TodoList
           tasks={tasks}
           filter={filter}
