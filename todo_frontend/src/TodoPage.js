@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "./TodoPage.css";
+import MotivationWidget from "./MotivationWidget";
 
 // --- StatusBar: Topmost fake mobile status bar (network, wifi, battery) ---
 function StatusBar() {
@@ -265,6 +266,8 @@ export default function TodoPage() {
       <StatusBar />
       <AppBar />
       <div className="todo-content-area">
+        {/* Motivational AI Quote Widget (OpenAI integration demo) */}
+        <MotivationWidget />
         <TodoList
           tasks={tasks}
           filter={filter}

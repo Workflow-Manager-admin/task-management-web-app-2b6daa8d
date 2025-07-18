@@ -30,5 +30,10 @@
   },
   "devDependencies": {
     "cross-env": "^7.0.3"
+  },
+  "description": "Minimal React todos app with OpenAI integration for motivational AI suggestions.",
+  "keywords": ["react", "todo", "openai", "motivation", "chatgpt"],
+  "engines": {
+    "node": ">=14"
   }
 }
